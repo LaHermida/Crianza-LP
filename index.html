@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Las Palmas">
+<meta name="theme-color" content="#b4532a">
 <title>CrianzaLP — Las Palmas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -144,9 +148,14 @@
         <tbody id="dashSalLoteBody"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
       </table></div>
       <div class="group-label">📋 Salidas por etapa de vida</div>
-      <div class="table-wrap" style="max-width:520px"><table>
+      <div class="table-wrap" style="max-width:520px;margin-bottom:1.5rem"><table>
         <thead><tr><th>Etapa</th><th>Salidas</th><th>% del total</th></tr></thead>
         <tbody id="dashEtapaBody"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+      <div class="group-label">🩺 Salidas por razón</div>
+      <div class="table-wrap" style="max-width:560px"><table>
+        <thead><tr><th>Razón</th><th>Salidas</th><th>% del total</th></tr></thead>
+        <tbody id="dashRazonBody"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
       </table></div>
     </div>
 
@@ -468,6 +477,14 @@ function renderDashboard(){
   let etRows=ETAPAS.map((et,i)=>`<tr><td>${et.n}</td><td class="mono">${etapaCnt[i]}</td><td class="mono">${totEt?Math.round(etapaCnt[i]/totEt*100):0}%</td></tr>`).join('');
   if(sinEdad) etRows+=`<tr><td>Sin edad registrada</td><td class="mono">${sinEdad}</td><td class="mono">${totEt?Math.round(sinEdad/totEt*100):0}%</td></tr>`;
   document.getElementById('dashEtapaBody').innerHTML = totEt?etRows:'<tr><td colspan="3" class="empty">Sin salidas.</td></tr>';
+
+  // Salidas por razón
+  const razonCnt={};
+  salidas.forEach(s=>{ const r=toStr(s.razon)||'Sin razón'; razonCnt[r]=(razonCnt[r]||0)+1; });
+  const razonRows=Object.entries(razonCnt).sort((a,b)=>b[1]-a[1]);
+  const totR=salidas.length;
+  document.getElementById('dashRazonBody').innerHTML = razonRows.length?razonRows.map(([r,c])=>
+    `<tr><td>${r}</td><td class="mono">${c}</td><td class="mono">${totR?Math.round(c/totR*100):0}%</td></tr>`).join(''):'<tr><td colspan="3" class="empty">Sin salidas.</td></tr>';
 
   // Charts
   const A='#b4532a', A2='#c77800', G='#2d6a4f';
