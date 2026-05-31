@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CrianzaLP — Las Palmas</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
@@ -24,6 +25,7 @@
   main{padding:1.5rem;max-width:1500px}
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem}
   .section-title{font-family:'IBM Plex Mono',monospace;font-size:.95rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em}
+  .group-label{font-family:'IBM Plex Mono',monospace;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin:1.5rem 0 .75rem;padding:.25rem .6rem;background:rgba(180,83,42,.08);border-left:3px solid var(--accent);border-radius:0 4px 4px 0}
   .btn{font-family:'IBM Plex Sans',sans-serif;font-size:.85rem;font-weight:500;padding:.5rem 1.1rem;border-radius:5px;border:none;cursor:pointer;transition:all .15s}
   .btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-dark)}
   .btn-secondary{background:var(--surface);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--row-hover)}
@@ -41,7 +43,6 @@
   .form-group{display:flex;flex-direction:column;gap:.35rem}
   .form-group.wide{grid-column:span 2}
   label{font-size:.74rem;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
-  .hint{font-size:.7rem;color:var(--text-muted);text-transform:none;letter-spacing:0;font-style:italic}
   input,select{font-family:'IBM Plex Sans',sans-serif;font-size:.9rem;padding:.5rem .65rem;border:1.5px solid var(--border);border-radius:5px;background:var(--input-bg);color:var(--text);transition:border-color .15s;width:100%}
   input:focus,select:focus{outline:none;border-color:var(--accent)}
   .table-wrap{overflow-x:auto;border:1.5px solid var(--border);border-radius:8px;background:var(--surface)}
@@ -57,8 +58,16 @@
   .ok{color:#2d6a4f;font-weight:600}.warn{color:#c77800;font-weight:600}.bad{color:#c62828;font-weight:600}
   .stats-row{display:flex;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap}
   .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:.85rem 1.3rem;min-width:120px}
-  .stat-card .val{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:600;color:var(--accent)}
+  .stat-card .val{font-family:'IBM Plex Mono',monospace;font-size:1.55rem;font-weight:600;color:var(--accent)}
   .stat-card .lbl{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:1rem;margin-bottom:1.5rem}
+  .chart-card{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:1rem}
+  .chart-card h4{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.75rem}
+  .chart-card canvas{max-height:230px}
+  .imp-card{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:1.25rem 1.4rem;margin-bottom:1rem;max-width:680px}
+  .imp-card h3{font-family:'IBM Plex Mono',monospace;font-size:.9rem;color:var(--accent);margin-bottom:.4rem}
+  .imp-card p{font-size:.84rem;color:var(--text-muted);line-height:1.5;margin-bottom:.9rem}
+  .imp-card .toolbar{display:flex;gap:.5rem;flex-wrap:wrap}
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
   .login-box{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:2.5rem;width:360px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
   .login-box h1{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;color:var(--accent);margin-bottom:.3rem}
@@ -72,6 +81,9 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .setup-banner{background:#fff8e1;border:1.5px solid var(--yellow);border-radius:8px;padding:.8rem 1rem;margin-bottom:1.25rem;font-size:.85rem;color:#7a5c00;line-height:1.5}
   .toolbar{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+  .yfilter{display:flex;gap:.4rem}
+  .yfilter button{font-family:'IBM Plex Mono',monospace;font-size:.78rem;padding:.3rem .8rem;border-radius:5px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text-muted)}
+  .yfilter button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -93,17 +105,50 @@
 <div id="appView" class="hidden">
   <header>
     <h1>🌴 CrianzaLP</h1>
-    <span style="display:flex;gap:1rem;align-items:center">
-      <span id="headerFecha"></span><span id="userLabel"></span>
-    </span>
+    <span style="display:flex;gap:1rem;align-items:center"><span id="headerFecha"></span><span id="userLabel"></span></span>
   </header>
   <nav id="mainNav">
+    <button onclick="showTab('dashboard',this)">📊 Dashboard</button>
     <button onclick="showTab('partos',this)">🐄 Partos</button>
     <button onclick="showTab('gap',this)">📈 GAP</button>
     <button onclick="showTab('inventario',this)">🐮 Inventario</button>
+    <button onclick="showTab('importar',this)">📥 Importar</button>
   </nav>
   <main>
     <div id="setupBanner" class="setup-banner hidden"></div>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="hidden">
+      <div class="section-header">
+        <span class="section-title">📊 Dashboard</span>
+        <div class="yfilter" id="yfilter">
+          <button onclick="setDashYear('all',this)" class="active">Todo</button>
+          <button onclick="setDashYear('2025',this)">2025</button>
+          <button onclick="setDashYear('2026',this)">2026</button>
+        </div>
+      </div>
+      <div class="stats-row" id="dashKpis"></div>
+      <div class="chart-grid">
+        <div class="chart-card"><h4>Nacimientos por mes</h4><canvas id="chNac"></canvas></div>
+        <div class="chart-card"><h4>Refractometría promedio por mes</h4><canvas id="chRef"></canvas></div>
+        <div class="chart-card"><h4>Salidas por etapa de vida</h4><canvas id="chEtapa"></canvas></div>
+      </div>
+      <div class="group-label">📅 Por grupo mensual de nacimiento</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem"><table>
+        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Peso Nacer Prom</th><th>Refrac. Prom</th><th>% ≥9</th><th>GDP→65 Prom</th><th>Peso 180 Prom</th></tr></thead>
+        <tbody id="dashLoteBody"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+      <div class="group-label">🚪 Salidas por grupo mensual de nacimiento</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem;max-width:640px"><table>
+        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Salidas</th><th>% Salidas</th></tr></thead>
+        <tbody id="dashSalLoteBody"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+      <div class="group-label">📋 Salidas por etapa de vida</div>
+      <div class="table-wrap" style="max-width:520px"><table>
+        <thead><tr><th>Etapa</th><th>Salidas</th><th>% del total</th></tr></thead>
+        <tbody id="dashEtapaBody"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+    </div>
 
     <!-- PARTOS -->
     <div id="tab-partos" class="hidden">
@@ -112,9 +157,6 @@
         <span class="section-title">Registro de Partos</span>
         <div class="toolbar">
           <span id="ultimoParto" style="font-size:.82rem;color:var(--text-muted)"></span>
-          <button class="btn btn-secondary" onclick="tplPartos()">📄 Plantilla</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('impPartos').click()">📥 Importar</button>
-          <input type="file" id="impPartos" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPartos(event)"/>
           <button class="btn btn-primary" onclick="openPartoModal()">+ Nuevo</button>
         </div>
       </div>
@@ -129,22 +171,10 @@
       <div class="stats-row" id="gapStats"></div>
       <div class="section-header">
         <span class="section-title">GAP — Pesos 65 / 90 / 150 / 180 días</span>
-        <div class="toolbar">
-          <button class="btn btn-secondary" onclick="tplGap()">📄 Plantilla</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('impGap').click()">📥 Importar</button>
-          <input type="file" id="impGap" accept=".xlsx,.xls,.csv" class="hidden" onchange="importGap(event)"/>
-          <button class="btn btn-primary" onclick="openGapModal()">+ Registrar</button>
-        </div>
+        <button class="btn btn-primary" onclick="openGapModal()">+ Registrar</button>
       </div>
       <div class="table-wrap"><table>
-        <thead><tr>
-          <th>Arete</th><th>Nacer</th>
-          <th>65d</th><th>GDP→65</th>
-          <th>90d</th><th>GDP→90</th>
-          <th>150d</th><th>GDP→150</th>
-          <th>180d</th><th>GDP→180</th>
-          <th>Acciones</th>
-        </tr></thead>
+        <thead><tr><th>Arete</th><th>Nacer</th><th>65d</th><th>GDP→65</th><th>90d</th><th>GDP→90</th><th>150d</th><th>GDP→150</th><th>180d</th><th>GDP→180</th><th>Acciones</th></tr></thead>
         <tbody id="gapBody"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
       </table></div>
     </div>
@@ -154,12 +184,7 @@
       <div class="stats-row" id="invStats"></div>
       <div class="section-header">
         <span class="section-title">🐮 Inventario & Salidas</span>
-        <div class="toolbar">
-          <button class="btn btn-secondary" onclick="tplSalidas()">📄 Plantilla</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('impSalidas').click()">📥 Importar Salidas</button>
-          <input type="file" id="impSalidas" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
-          <button class="btn btn-primary" onclick="openSalidaModal()">+ Salida</button>
-        </div>
+        <button class="btn btn-primary" onclick="openSalidaModal()">+ Salida</button>
       </div>
       <div class="section-header" style="margin-bottom:.6rem"><span class="section-title" style="font-size:.82rem">Becerras Activas en Hato</span></div>
       <div class="table-wrap" style="margin-bottom:1.75rem"><table>
@@ -171,6 +196,39 @@
         <thead><tr><th>Arete</th><th>Fecha Salida</th><th>Edad</th><th>Razón</th><th>Tipo</th><th>Acciones</th></tr></thead>
         <tbody id="salidasBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
       </table></div>
+    </div>
+
+    <!-- IMPORTAR -->
+    <div id="tab-importar" class="hidden">
+      <div class="section-header"><span class="section-title">📥 Importar datos desde Excel/CSV</span></div>
+      <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:1.25rem;max-width:680px">Baja la plantilla, llénala con tus datos y súbela. <strong>Importa cada archivo una sola vez</strong> (no detecta duplicados). Carga primero Partos, luego GAP y Salidas.</p>
+      <div class="imp-card">
+        <h3>🐄 Partos</h3>
+        <p>Columnas: Fecha · Arete · Peso Nacer · Refractometría · Lts 1ª Toma · Observaciones.</p>
+        <div class="toolbar">
+          <button class="btn btn-secondary" onclick="tplPartos()">📄 Plantilla</button>
+          <button class="btn btn-primary" onclick="document.getElementById('impPartos').click()">📥 Importar Partos</button>
+          <input type="file" id="impPartos" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPartos(event)"/>
+        </div>
+      </div>
+      <div class="imp-card">
+        <h3>📈 GAP (pesos)</h3>
+        <p>Columnas: Arete · Peso 65 · Peso 90 · Peso 150 · Peso 180.</p>
+        <div class="toolbar">
+          <button class="btn btn-secondary" onclick="tplGap()">📄 Plantilla</button>
+          <button class="btn btn-primary" onclick="document.getElementById('impGap').click()">📥 Importar GAP</button>
+          <input type="file" id="impGap" accept=".xlsx,.xls,.csv" class="hidden" onchange="importGap(event)"/>
+        </div>
+      </div>
+      <div class="imp-card">
+        <h3>🚪 Salidas</h3>
+        <p>Columnas: Arete · Fecha Salida · Razón · Tipo. La edad se calcula sola con la fecha de nacimiento del parto.</p>
+        <div class="toolbar">
+          <button class="btn btn-secondary" onclick="tplSalidas()">📄 Plantilla</button>
+          <button class="btn btn-primary" onclick="document.getElementById('impSalidas').click()">📥 Importar Salidas</button>
+          <input type="file" id="impSalidas" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
+        </div>
+      </div>
     </div>
   </main>
 </div>
@@ -232,16 +290,23 @@ const USERS = {
 const REFRAC_OK = 9;
 const GDP_OK = 0.8, GDP_WARN = 0.6;
 const EDADES = {p65:65, p90:90, p150:150, p180:180};
+const ETAPAS = [
+  {n:'0-65 días',    min:0,   max:65},
+  {n:'66-90 días',   min:66,  max:90},
+  {n:'91-180 días',  min:91,  max:180},
+  {n:'181-375 días', min:181, max:375},
+  {n:'375+ días',    min:376, max:9999999},
+];
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 /* ============================================================ */
 
-let currentUser=null, editingPartoId=null, editingGapId=null;
+let currentUser=null, editingPartoId=null, editingGapId=null, dashYear='all';
 let _partos=[], _gap=[], _salidas=[];
+const charts={};
 
 function doLogin(){
-  const u=document.getElementById('loginUser').value.trim();
-  const p=document.getElementById('loginPass').value;
-  if(USERS[u]&&USERS[u].pass===p){ launchApp(u); }
-  else { document.getElementById('loginError').classList.remove('hidden'); }
+  const u=document.getElementById('loginUser').value.trim(), p=document.getElementById('loginPass').value;
+  if(USERS[u]&&USERS[u].pass===p){ launchApp(u); } else { document.getElementById('loginError').classList.remove('hidden'); }
 }
 function launchApp(u){
   currentUser={name:u,role:USERS[u].role};
@@ -249,13 +314,13 @@ function launchApp(u){
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('userLabel').textContent=u;
-  const hoy=new Date(), dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  document.getElementById('headerFecha').textContent=`${dias[hoy.getDay()]} ${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+  const hoy=new Date(), d=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  document.getElementById('headerFecha').textContent=`${d[hoy.getDay()]} ${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
   if(SUPABASE_URL.includes('TU-PROYECTO')||SUPABASE_KEY.includes('TU-ANON-KEY')){
     const b=document.getElementById('setupBanner'); b.classList.remove('hidden');
     b.innerHTML='⚙️ <strong>Falta configurar Supabase.</strong> Pega tu Project URL y anon key en la sección CONFIGURACIÓN del archivo.';
   }
-  showTab('partos', document.querySelector('#mainNav button'));
+  showTab('dashboard', document.querySelector('#mainNav button'));
 }
 window.addEventListener('DOMContentLoaded',()=>{ const s=sessionStorage.getItem('clp_user'); if(s&&USERS[s]) launchApp(s); });
 
@@ -272,13 +337,11 @@ async function bulkInsert(table, records){
   let ok=0, err=0; const CH=500;
   for(let i=0;i<records.length;i+=CH){
     const batch=records.slice(i,i+CH);
-    try{ const res=await sb(table,'POST',batch); if(res.ok) ok+=batch.length; else err+=batch.length; }
-    catch(e){ err+=batch.length; }
+    try{ const res=await sb(table,'POST',batch); if(res.ok) ok+=batch.length; else err+=batch.length; }catch(e){ err+=batch.length; }
   }
   return {ok,err};
 }
 
-// HELPERS
 function fmtFecha(s){ if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:s; }
 function avg(a){ return a.length?a.reduce((x,y)=>x+y,0)/a.length:null; }
 function fmtN(v,d=1){ return v!=null?(+v).toFixed(d):'—'; }
@@ -291,7 +354,7 @@ function toArete(v){ if(v===null||v===undefined||v==='') return null; let s=Stri
 function parseFecha(v){
   if(v===null||v===undefined||v==='') return null;
   if(v instanceof Date && !isNaN(v)){ return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`; }
-  if(typeof v==='number' && v>30000 && v<60000){ const d=new Date((v-25569)*86400000); return d.toISOString().slice(0,10); }
+  if(typeof v==='number' && v>30000 && v<60000){ return new Date((v-25569)*86400000).toISOString().slice(0,10); }
   const s=String(v).trim();
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
   let m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
@@ -299,16 +362,15 @@ function parseFecha(v){
   if(/^\d{4,5}$/.test(s)){ const d=new Date((+s-25569)*86400000); if(!isNaN(d)) return d.toISOString().slice(0,10); }
   return null;
 }
-function parseRefracText(txt){ // "Ref.9.9/4.0 lts" -> {refrac, lts}
-  const nums=String(txt).match(/\d+\.?\d*/g)||[];
-  return { refrac: nums[0]!=null?parseFloat(nums[0]):null, lts: nums[1]!=null?parseFloat(nums[1]):null };
-}
+function parseRefracText(txt){ const nums=String(txt).match(/\d+\.?\d*/g)||[]; return { refrac:nums[0]!=null?parseFloat(nums[0]):null, lts:nums[1]!=null?parseFloat(nums[1]):null }; }
+function loteLabel(key){ const [y,m]=key.split('-'); return `${MESES[+m-1]} ${y}`; }
 
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
-  ['partos','gap','inventario'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
+  ['dashboard','partos','gap','inventario','importar'].forEach(t=>document.getElementById('tab-'+t).classList.add('hidden'));
   document.getElementById('tab-'+tab).classList.remove('hidden');
+  if(tab==='dashboard') loadDashboard();
   if(tab==='partos') loadPartos();
   if(tab==='gap') loadGap();
   if(tab==='inventario') loadInventario();
@@ -329,6 +391,89 @@ async function readFile(file){
   const ws=wb.Sheets[wb.SheetNames[0]];
   const arr=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   return arr.slice(1).filter(r=>r&&r.some(v=>v!==null&&v!==''));
+}
+
+// ============ DASHBOARD ============
+async function loadDashboard(){
+  try{ const [p,g,s]=await Promise.all([ sb('partos_palmas?limit=50000'), sb('gap_palmas?limit=50000'), sb('salidas_palmas?limit=50000') ]); _partos=p||[]; _gap=g||[]; _salidas=s||[]; }catch(e){}
+  renderDashboard();
+}
+function setDashYear(y,btn){ dashYear=y; document.querySelectorAll('#yfilter button').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderDashboard(); }
+function mkChart(id,type,labels,datasets,opts={}){
+  if(charts[id]){ charts[id].destroy(); }
+  const ctx=document.getElementById(id); if(!ctx) return;
+  charts[id]=new Chart(ctx,{ type, data:{labels,datasets},
+    options:{ responsive:true, maintainAspectRatio:true, plugins:{legend:{display:datasets.length>1||type==='doughnut',labels:{font:{size:10},boxWidth:12}}},
+      scales:(type==='bar'||type==='line')?{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:9}}}}:{}, ...opts } });
+}
+function renderDashboard(){
+  let hembras=_partos.filter(p=>esAreteNum(p.hembra)&&p.fecha_parto);
+  if(dashYear!=='all') hembras=hembras.filter(p=>p.fecha_parto.slice(0,4)===dashYear);
+  const setH=new Set(hembras.map(p=>String(p.hembra).trim()));
+  const partoMap={}; hembras.forEach(p=>partoMap[String(p.hembra).trim()]=p);
+  const gapMap={}; _gap.forEach(g=>gapMap[String(g.hembra).trim()]=g);
+  const salidas=_salidas.filter(s=>setH.has(String(s.hembra).trim()));
+
+  // KPIs
+  const nacidas=hembras.length;
+  const salN=salidas.length;
+  const activas=nacidas-salN;
+  const pct=nacidas?Math.round(activas/nacidas*100):0;
+  const refr=hembras.filter(p=>p.refractometria!=null).map(p=>p.refractometria);
+  const refOk=refr.filter(v=>v>=REFRAC_OK).length;
+  const pesos=hembras.filter(p=>p.peso_nacer!=null).map(p=>p.peso_nacer);
+  const gdp65=[]; hembras.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(g&&g.peso_65!=null&&p.peso_nacer!=null) gdp65.push((g.peso_65-p.peso_nacer)/EDADES.p65); });
+  document.getElementById('dashKpis').innerHTML=`
+    <div class="stat-card"><div class="val">${nacidas}</div><div class="lbl">Nacidas</div></div>
+    <div class="stat-card"><div class="val">${activas}</div><div class="lbl">Activas (${pct}%)</div></div>
+    <div class="stat-card"><div class="val">${salN}</div><div class="lbl">Salidas</div></div>
+    <div class="stat-card"><div class="val">${fmtN(avg(pesos))}</div><div class="lbl">Peso Nacer Prom</div></div>
+    <div class="stat-card"><div class="val">${fmtN(avg(refr))}</div><div class="lbl">Refrac. Prom</div></div>
+    <div class="stat-card"><div class="val">${refr.length?Math.round(refOk/refr.length*100):0}%</div><div class="lbl">Refrac. ≥9</div></div>
+    <div class="stat-card"><div class="val">${gdp65.length?avg(gdp65).toFixed(3):'—'}</div><div class="lbl">GDP→65 Prom</div></div>`;
+
+  // Agrupar por lote mensual de nacimiento
+  const lotes={};
+  hembras.forEach(p=>{ const k=p.fecha_parto.slice(0,7); (lotes[k]=lotes[k]||[]).push(p); });
+  const keys=Object.keys(lotes).sort();
+
+  // Tabla por lote
+  document.getElementById('dashLoteBody').innerHTML = keys.length?keys.map(k=>{
+    const arr=lotes[k];
+    const ps=arr.filter(p=>p.peso_nacer!=null).map(p=>p.peso_nacer);
+    const rf=arr.filter(p=>p.refractometria!=null).map(p=>p.refractometria);
+    const rok=rf.filter(v=>v>=REFRAC_OK).length;
+    const g65=[],p180=[];
+    arr.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(g){ if(g.peso_65!=null&&p.peso_nacer!=null) g65.push((g.peso_65-p.peso_nacer)/EDADES.p65); if(g.peso_180!=null) p180.push(g.peso_180); } });
+    const gAvg=g65.length?avg(g65):null;
+    return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${arr.length}</td>
+      <td class="mono">${fmtN(avg(ps))}</td><td class="mono">${fmtN(avg(rf))}</td>
+      <td class="mono ${rf.length&&rok/rf.length>=0.8?'ok':rf.length&&rok/rf.length>=0.6?'warn':'bad'}">${rf.length?Math.round(rok/rf.length*100):0}%</td>
+      <td class="mono ${gdpClass(gAvg)}">${gAvg!=null?gAvg.toFixed(3):'—'}</td><td class="mono">${fmtN(avg(p180))}</td></tr>`;
+  }).join(''):'<tr><td colspan="7" class="empty">Sin datos.</td></tr>';
+
+  // Salidas por lote
+  const salLote={};
+  salidas.forEach(s=>{ const p=partoMap[String(s.hembra).trim()]; if(p){ const k=p.fecha_parto.slice(0,7); salLote[k]=(salLote[k]||0)+1; } });
+  document.getElementById('dashSalLoteBody').innerHTML = keys.length?keys.map(k=>{
+    const n=lotes[k].length, sl=salLote[k]||0;
+    return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${n}</td><td class="mono">${sl}</td>
+      <td class="mono ${n&&sl/n>=0.3?'bad':n&&sl/n>=0.15?'warn':'ok'}">${n?Math.round(sl/n*100):0}%</td></tr>`;
+  }).join(''):'<tr><td colspan="4" class="empty">Sin datos.</td></tr>';
+
+  // Salidas por etapa
+  const etapaCnt=ETAPAS.map(()=>0); let sinEdad=0;
+  salidas.forEach(s=>{ const e=s.edad_dias; if(e==null){ sinEdad++; return; } const i=ETAPAS.findIndex(et=>e>=et.min&&e<=et.max); if(i>=0) etapaCnt[i]++; });
+  const totEt=etapaCnt.reduce((a,b)=>a+b,0)+sinEdad;
+  let etRows=ETAPAS.map((et,i)=>`<tr><td>${et.n}</td><td class="mono">${etapaCnt[i]}</td><td class="mono">${totEt?Math.round(etapaCnt[i]/totEt*100):0}%</td></tr>`).join('');
+  if(sinEdad) etRows+=`<tr><td>Sin edad registrada</td><td class="mono">${sinEdad}</td><td class="mono">${totEt?Math.round(sinEdad/totEt*100):0}%</td></tr>`;
+  document.getElementById('dashEtapaBody').innerHTML = totEt?etRows:'<tr><td colspan="3" class="empty">Sin salidas.</td></tr>';
+
+  // Charts
+  const A='#b4532a', A2='#c77800', G='#2d6a4f';
+  mkChart('chNac','bar',keys.map(loteLabel),[{label:'Nacidas',data:keys.map(k=>lotes[k].length),backgroundColor:'rgba(180,83,42,.75)'}]);
+  mkChart('chRef','line',keys.map(loteLabel),[{label:'Refrac',data:keys.map(k=>{const rf=lotes[k].filter(p=>p.refractometria!=null).map(p=>p.refractometria);const a=avg(rf);return a?+a.toFixed(2):null;}),borderColor:A2,backgroundColor:'rgba(199,120,0,.1)',tension:.3,fill:true}]);
+  mkChart('chEtapa','doughnut',ETAPAS.map(e=>e.n),[{data:etapaCnt,backgroundColor:['#e8d5cc','#e0a878','#c77800','#b4532a','#7a2d12'],borderWidth:1}]);
 }
 
 // ============ PARTOS ============
@@ -353,13 +498,9 @@ function renderPartos(){
   if(!_partos.length){ tb.innerHTML='<tr><td colspan="7" class="empty">Sin registros.</td></tr>'; return; }
   tb.innerHTML=_partos.slice(0,2000).map(r=>{
     const rc=r.refractometria!=null?(r.refractometria>=REFRAC_OK?'ok':'bad'):'';
-    return `<tr>
-      <td class="mono">${fmtFecha(r.fecha_parto)}</td>
-      <td class="mono" style="font-weight:600">${r.hembra||'—'}</td>
-      <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td>
-      <td class="mono ${rc}">${r.refractometria!=null?r.refractometria:'—'}</td>
-      <td class="mono">${r.lts_primera_toma!=null?r.lts_primera_toma:'—'}</td>
-      <td style="white-space:normal;max-width:200px">${r.observaciones||'—'}</td>
+    return `<tr><td class="mono">${fmtFecha(r.fecha_parto)}</td><td class="mono" style="font-weight:600">${r.hembra||'—'}</td>
+      <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td><td class="mono ${rc}">${r.refractometria!=null?r.refractometria:'—'}</td>
+      <td class="mono">${r.lts_primera_toma!=null?r.lts_primera_toma:'—'}</td><td style="white-space:normal;max-width:200px">${r.observaciones||'—'}</td>
       <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" onclick="editParto(${r.id})">✏️</button>
       ${currentUser?.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteParto(${r.id})" style="margin-left:4px">🗑</button>`:''}</td></tr>`;
   }).join('') + (_partos.length>2000?`<tr><td colspan="7" class="empty">Mostrando 2000 de ${_partos.length}.</td></tr>`:'');
@@ -376,8 +517,7 @@ async function saveParto(){
   if(!fecha||!arete){ alert('Fecha y arete son obligatorios'); return; }
   const btn=document.getElementById('partoSaveBtn'); btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
   const payload={ fecha_parto:fecha, hembra:arete, peso_nacer:toNum(document.getElementById('f_peso').value), refractometria:toNum(document.getElementById('f_refrac').value), lts_primera_toma:toNum(document.getElementById('f_lts').value), observaciones:document.getElementById('f_obs').value||null };
-  try{ if(editingPartoId) await sb(`partos_palmas?id=eq.${editingPartoId}`,'PATCH',payload); else await sb('partos_palmas','POST',payload); closePartoModal(); await loadPartos(); }
-  catch(e){ alert('Error al guardar.'); }
+  try{ if(editingPartoId) await sb(`partos_palmas?id=eq.${editingPartoId}`,'PATCH',payload); else await sb('partos_palmas','POST',payload); closePartoModal(); await loadPartos(); }catch(e){ alert('Error al guardar.'); }
   btn.innerHTML='Guardar'; btn.disabled=false;
 }
 async function deleteParto(id){ if(!confirm('¿Eliminar este registro?')) return; await sb(`partos_palmas?id=eq.${id}`,'DELETE'); await loadPartos(); }
@@ -385,23 +525,18 @@ function tplPartos(){ const wb=XLSX.utils.book_new(); XLSX.utils.book_append_she
 async function importPartos(ev){
   const file=ev.target.files[0]; if(!file) return; ev.target.value='';
   const rows=await readFile(file); if(!rows.length){ alert('Archivo vacío.'); return; }
-  const recs=rows.map(r=>{
-    const fecha=parseFecha(r[0]); const arete=toArete(r[1]); if(!fecha||!arete) return null;
+  const recs=rows.map(r=>{ const fecha=parseFecha(r[0]); const arete=toArete(r[1]); if(!fecha||!arete) return null;
     let refrac=toNum(r[3]), lts=toNum(r[4]);
     if(refrac==null && typeof r[3]==='string' && /ref/i.test(r[3])){ const p=parseRefracText(r[3]); refrac=p.refrac; if(lts==null) lts=p.lts; }
-    return { fecha_parto:fecha, hembra:arete, peso_nacer:toNum(r[2]), refractometria:refrac, lts_primera_toma:lts, observaciones:toStr(r[5]) };
-  }).filter(Boolean);
-  if(!recs.length){ alert('No se encontraron filas válidas. Revisa que tenga Fecha y Arete.'); return; }
+    return { fecha_parto:fecha, hembra:arete, peso_nacer:toNum(r[2]), refractometria:refrac, lts_primera_toma:lts, observaciones:toStr(r[5]) }; }).filter(Boolean);
+  if(!recs.length){ alert('No se encontraron filas válidas (revisa Fecha y Arete).'); return; }
   if(!confirm(`Se importarán ${recs.length} partos. ¿Continuar?`)) return;
   const {ok,err}=await bulkInsert('partos_palmas',recs);
-  alert(`✅ ${ok} importados${err?` · ⚠️ ${err} con error`:''}`); await loadPartos();
+  alert(`✅ ${ok} importados${err?` · ⚠️ ${err} con error`:''}`); showTab('partos',document.querySelectorAll('#mainNav button')[1]);
 }
 
 // ============ GAP ============
-async function loadGap(){
-  try{ const [g,p]=await Promise.all([ sb('gap_palmas?order=id.desc&limit=50000'), sb('partos_palmas?limit=50000') ]); _gap=g||[]; _partos=p||[]; }catch(e){ _gap=[]; }
-  renderGapStats(); renderGap();
-}
+async function loadGap(){ try{ const [g,p]=await Promise.all([ sb('gap_palmas?order=id.desc&limit=50000'), sb('partos_palmas?limit=50000') ]); _gap=g||[]; _partos=p||[]; }catch(e){ _gap=[]; } renderGapStats(); renderGap(); }
 function gapRow(r){
   const parto=_partos.find(p=>String(p.hembra).trim()===String(r.hembra).trim());
   const pn=parto?parto.peso_nacer:null;
@@ -412,8 +547,7 @@ function gapRow(r){
   return {pn,g65,g90,g150,g180};
 }
 function renderGapStats(){
-  const c=k=>_gap.filter(r=>r[k]!=null).length;
-  const m=k=>avg(_gap.filter(r=>r[k]!=null).map(r=>r[k]));
+  const c=k=>_gap.filter(r=>r[k]!=null).length, m=k=>avg(_gap.filter(r=>r[k]!=null).map(r=>r[k]));
   const gd=_gap.map(gapRow).filter(x=>x.g65!=null).map(x=>x.g65);
   document.getElementById('gapStats').innerHTML=`
     <div class="stat-card"><div class="val">${c('peso_65')}</div><div class="lbl">Con peso 65d</div></div>
@@ -445,8 +579,7 @@ async function saveGap(){
   const arete=document.getElementById('g_arete').value.trim(); if(!arete){ alert('El arete es obligatorio'); return; }
   const btn=document.getElementById('gapSaveBtn'); btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
   const payload={ hembra:arete, peso_65:toNum(document.getElementById('g_p65').value), peso_90:toNum(document.getElementById('g_p90').value), peso_150:toNum(document.getElementById('g_p150').value), peso_180:toNum(document.getElementById('g_p180').value) };
-  try{ if(editingGapId) await sb(`gap_palmas?id=eq.${editingGapId}`,'PATCH',payload); else await sb('gap_palmas','POST',payload); closeGapModal(); await loadGap(); }
-  catch(e){ alert('Error al guardar.'); }
+  try{ if(editingGapId) await sb(`gap_palmas?id=eq.${editingGapId}`,'PATCH',payload); else await sb('gap_palmas','POST',payload); closeGapModal(); await loadGap(); }catch(e){ alert('Error al guardar.'); }
   btn.innerHTML='Guardar'; btn.disabled=false;
 }
 async function deleteGap(id){ if(!confirm('¿Eliminar este registro?')) return; await sb(`gap_palmas?id=eq.${id}`,'DELETE'); await loadGap(); }
@@ -458,14 +591,11 @@ async function importGap(ev){
   if(!recs.length){ alert('No se encontraron filas válidas.'); return; }
   if(!confirm(`Se importarán ${recs.length} registros de pesos. ¿Continuar?`)) return;
   const {ok,err}=await bulkInsert('gap_palmas',recs);
-  alert(`✅ ${ok} importados${err?` · ⚠️ ${err} con error`:''}`); await loadGap();
+  alert(`✅ ${ok} importados${err?` · ⚠️ ${err} con error`:''}`); showTab('gap',document.querySelectorAll('#mainNav button')[2]);
 }
 
 // ============ INVENTARIO ============
-async function loadInventario(){
-  try{ const [p,s]=await Promise.all([ sb('partos_palmas?limit=50000'), sb('salidas_palmas?order=fecha_salida.desc&limit=50000') ]); _partos=p||[]; _salidas=s||[]; }catch(e){ _partos=[]; _salidas=[]; }
-  renderInventario();
-}
+async function loadInventario(){ try{ const [p,s]=await Promise.all([ sb('partos_palmas?limit=50000'), sb('salidas_palmas?order=fecha_salida.desc&limit=50000') ]); _partos=p||[]; _salidas=s||[]; }catch(e){ _partos=[]; _salidas=[]; } renderInventario(); }
 function renderInventario(){
   const hoy=new Date();
   const salidaSet=new Set(_salidas.map(s=>String(s.hembra).trim()));
@@ -483,8 +613,7 @@ function renderInventario(){
   ab.innerHTML=activas.length?activas.slice(0,3000).map(p=>{ const d=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
     return `<tr><td class="mono" style="font-weight:600">${p.hembra}</td><td class="mono">${fmtFecha(p.fecha_parto)}</td><td class="mono">${d}</td></tr>`; }).join(''):'<tr><td colspan="3" class="empty">Sin becerras activas.</td></tr>';
   const sb_=document.getElementById('salidasBody');
-  sb_.innerHTML=_salidas.length?_salidas.slice(0,3000).map(s=>`<tr>
-    <td class="mono" style="font-weight:600">${s.hembra}</td><td class="mono">${fmtFecha(s.fecha_salida)}</td>
+  sb_.innerHTML=_salidas.length?_salidas.slice(0,3000).map(s=>`<tr><td class="mono" style="font-weight:600">${s.hembra}</td><td class="mono">${fmtFecha(s.fecha_salida)}</td>
     <td class="mono">${s.edad_dias!=null?s.edad_dias:'—'}</td><td>${s.razon||'—'}</td><td>${s.tipo||'—'}</td>
     <td>${currentUser?.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteSalida(${s.id})">🗑</button>`:''}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Sin salidas registradas.</td></tr>';
 }
@@ -496,8 +625,7 @@ async function saveSalida(){
   if(!arete||!fecha){ alert('Arete y fecha son obligatorios'); return; }
   const btn=document.getElementById('salidaSaveBtn'); btn.innerHTML='<span class="spinner"></span>'; btn.disabled=true;
   const payload={ hembra:arete, fecha_salida:fecha, razon:document.getElementById('s_razon').value||null, tipo:document.getElementById('s_tipo').value||null, edad_dias:edadDesdeParto(arete,fecha) };
-  try{ await sb('salidas_palmas','POST',payload); closeSalidaModal(); await loadInventario(); }
-  catch(e){ alert('Error al guardar.'); }
+  try{ await sb('salidas_palmas','POST',payload); closeSalidaModal(); await loadInventario(); }catch(e){ alert('Error al guardar.'); }
   btn.innerHTML='Guardar'; btn.disabled=false;
 }
 async function deleteSalida(id){ if(!confirm('¿Eliminar esta salida?')) return; await sb(`salidas_palmas?id=eq.${id}`,'DELETE'); await loadInventario(); }
@@ -508,10 +636,10 @@ async function importSalidas(ev){
   try{ _partos=await sb('partos_palmas?limit=50000')||[]; }catch(e){}
   const recs=rows.map(r=>{ const a=toArete(r[0]); const f=parseFecha(r[1]); if(!a||!f) return null;
     return { hembra:a, fecha_salida:f, razon:toStr(r[2]), tipo:toStr(r[3]), edad_dias:edadDesdeParto(a,f) }; }).filter(Boolean);
-  if(!recs.length){ alert('No se encontraron filas válidas. Revisa Arete y Fecha Salida.'); return; }
+  if(!recs.length){ alert('No se encontraron filas válidas (revisa Arete y Fecha Salida).'); return; }
   if(!confirm(`Se importarán ${recs.length} salidas. ¿Continuar?`)) return;
   const {ok,err}=await bulkInsert('salidas_palmas',recs);
-  alert(`✅ ${ok} importadas${err?` · ⚠️ ${err} con error`:''}`); await loadInventario();
+  alert(`✅ ${ok} importadas${err?` · ⚠️ ${err} con error`:''}`); showTab('inventario',document.querySelectorAll('#mainNav button')[3]);
 }
 </script>
 </body>
