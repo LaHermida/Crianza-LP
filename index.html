@@ -163,10 +163,10 @@
         <thead><tr><th>Refractometría</th><th>Becerras</th><th>GDP→65</th><th>GDP→90</th><th>GDP→150</th><th>GDP→180</th></tr></thead>
         <tbody id="dashRefracGdpBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
       </table></div>
-      <div class="group-label">📋 Salidas por etapa de vida</div>
-      <div class="table-wrap" style="max-width:520px;margin-bottom:1.5rem"><table>
-        <thead><tr><th>Etapa</th><th>Salidas</th><th>% del total</th></tr></thead>
-        <tbody id="dashEtapaBody"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
+      <div class="group-label">📋 Mortalidad por etapa de vida</div>
+      <div class="table-wrap" style="max-width:620px;margin-bottom:1.5rem"><table>
+        <thead><tr><th>Etapa</th><th>Iniciaron</th><th>Salidas</th><th>% Mortalidad</th></tr></thead>
+        <tbody id="dashEtapaBody"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
       </table></div>
       <div class="group-label">🩺 Salidas por razón</div>
       <div class="table-wrap" style="max-width:560px"><table>
@@ -513,13 +513,19 @@ function renderDashboard(){
   buildRefracGdpSelector();
   renderRefracGdp();
 
-  // Salidas por etapa
+  // Mortalidad por etapa (escalonada: cada etapa contra las que llegaron vivas)
   const etapaCnt=ETAPAS.map(()=>0); let sinEdad=0;
   salidas.forEach(s=>{ const e=s.edad_dias; if(e==null){ sinEdad++; return; } const i=ETAPAS.findIndex(et=>e>=et.min&&e<=et.max); if(i>=0) etapaCnt[i]++; });
-  const totEt=etapaCnt.reduce((a,b)=>a+b,0)+sinEdad;
-  let etRows=ETAPAS.map((et,i)=>`<tr><td>${et.n}</td><td class="mono">${etapaCnt[i]}</td><td class="mono">${totEt?Math.round(etapaCnt[i]/totEt*100):0}%</td></tr>`).join('');
-  if(sinEdad) etRows+=`<tr><td>Sin edad registrada</td><td class="mono">${sinEdad}</td><td class="mono">${totEt?Math.round(sinEdad/totEt*100):0}%</td></tr>`;
-  document.getElementById('dashEtapaBody').innerHTML = totEt?etRows:'<tr><td colspan="3" class="empty">Sin salidas.</td></tr>';
+  let iniciaron=nacidas;
+  let etRows=ETAPAS.map((et,i)=>{
+    const ini=iniciaron;
+    const mort=ini?Math.round(etapaCnt[i]/ini*100):0;
+    iniciaron=ini-etapaCnt[i]; // las que llegan a la siguiente etapa
+    return `<tr><td>${et.n}</td><td class="mono">${ini}</td><td class="mono">${etapaCnt[i]}</td>
+      <td class="mono ${mort>=15?'bad':mort>=8?'warn':'ok'}">${mort}%</td></tr>`;
+  }).join('');
+  if(sinEdad) etRows+=`<tr><td>Sin edad registrada</td><td class="mono">—</td><td class="mono">${sinEdad}</td><td class="mono">—</td></tr>`;
+  document.getElementById('dashEtapaBody').innerHTML = (etapaCnt.some(c=>c>0)||sinEdad)?etRows:'<tr><td colspan="4" class="empty">Sin salidas.</td></tr>';
 
   // Salidas por razón
   const razonCnt={};
