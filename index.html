@@ -140,15 +140,25 @@
       </div>
       <div class="group-label">📅 Por grupo mensual de nacimiento</div>
       <div class="table-wrap" style="margin-bottom:1.5rem"><table>
-        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Peso Nacer Prom</th><th>Refrac. Prom</th><th>% ≥9</th><th>GDP→65 Prom</th><th>Peso 180 Prom</th></tr></thead>
-        <tbody id="dashLoteBody"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Peso Nacer Prom</th><th>Refrac. Prom</th><th>% ≥9</th><th>GDP→65 Prom</th></tr></thead>
+        <tbody id="dashLoteBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
       </table></div>
       <div class="group-label">📅 Supervivencia por mes de nacida</div>
       <div class="table-wrap" style="margin-bottom:1.5rem;max-width:700px"><table>
         <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Activas en hato</th><th>Salidas</th><th>% Supervivencia</th></tr></thead>
         <tbody id="dashSalLoteBody"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
       </table></div>
-      <div class="group-label">🥛 Ganancia de peso (GDP) por refractometría</div>
+      <div class="group-label">📈 GDP por lote mensual de nacida (todos los tramos)</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem"><table>
+        <thead><tr><th>Mes (lote)</th><th>Becerras</th><th>GDP→65</th><th>GDP→90</th><th>GDP→150</th><th>GDP→180</th></tr></thead>
+        <tbody id="dashGdpLoteBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+      <div class="group-label" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+        <span>🥛 Ganancia de peso (GDP) por refractometría</span>
+        <select id="refracGdpSel" onchange="renderRefracGdp()" style="width:auto;font-size:.82rem;padding:.3rem .6rem;text-transform:none;letter-spacing:0;font-weight:400">
+          <option value="total">Total (todo)</option>
+        </select>
+      </div>
       <div class="table-wrap" style="margin-bottom:1.5rem"><table>
         <thead><tr><th>Refractometría</th><th>Becerras</th><th>GDP→65</th><th>GDP→90</th><th>GDP→150</th><th>GDP→180</th></tr></thead>
         <tbody id="dashRefracGdpBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
@@ -463,14 +473,14 @@ function renderDashboard(){
     const ps=arr.filter(p=>p.peso_nacer!=null).map(p=>p.peso_nacer);
     const rf=arr.filter(p=>p.refractometria!=null).map(p=>p.refractometria);
     const rok=rf.filter(v=>v>=REFRAC_OK).length;
-    const g65=[],p180=[];
-    arr.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(g){ if(g.peso_65!=null&&p.peso_nacer!=null) g65.push((g.peso_65-p.peso_nacer)/EDADES.p65); if(g.peso_180!=null) p180.push(g.peso_180); } });
+    const g65=[];
+    arr.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(g&&g.peso_65!=null&&p.peso_nacer!=null) g65.push((g.peso_65-p.peso_nacer)/EDADES.p65); });
     const gAvg=g65.length?avg(g65):null;
     return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${arr.length}</td>
       <td class="mono">${fmtN(avg(ps))}</td><td class="mono">${fmtN(avg(rf))}</td>
       <td class="mono ${rf.length&&rok/rf.length>=0.8?'ok':rf.length&&rok/rf.length>=0.6?'warn':'bad'}">${rf.length?Math.round(rok/rf.length*100):0}%</td>
-      <td class="mono ${gdpClass(gAvg)}">${gAvg!=null?gAvg.toFixed(3):'—'}</td><td class="mono">${fmtN(avg(p180))}</td></tr>`;
-  }).join(''):'<tr><td colspan="7" class="empty">Sin datos.</td></tr>';
+      <td class="mono ${gdpClass(gAvg)}">${gAvg!=null?gAvg.toFixed(3):'—'}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" class="empty">Sin datos.</td></tr>';
 
   // Supervivencia por lote (cuántas siguen en hato)
   const salLote={};
@@ -482,22 +492,26 @@ function renderDashboard(){
       <td class="mono ${pctS>=85?'ok':pctS>=70?'warn':'bad'}">${pctS}%</td></tr>`;
   }).join(''):'<tr><td colspan="5" class="empty">Sin datos.</td></tr>';
 
-  // GDP por refractometría (4 tramos)
-  const tramos=[['peso_65','peso_nacer',EDADES.p65,'p65'],['peso_90','peso_65',EDADES.p90-EDADES.p65,'p90'],['peso_150','peso_90',EDADES.p150-EDADES.p90,'p150'],['peso_180','peso_150',EDADES.p180-EDADES.p150,'p180']];
-  document.getElementById('dashRefracGdpBody').innerHTML = REFRAC_BANDS.map(band=>{
-    const conRefrac=hembras.filter(p=>p.refractometria!=null&&band.test(p.refractometria));
-    const cnt=conRefrac.length;
-    const gdpTramo=tramos.map(([cur,prev,dias])=>{
+  // GDP por lote mensual (4 tramos, sin relación a refractometría)
+  const tramosLote=[['peso_65','peso_nacer',EDADES.p65],['peso_90','peso_65',EDADES.p90-EDADES.p65],['peso_150','peso_90',EDADES.p150-EDADES.p90],['peso_180','peso_150',EDADES.p180-EDADES.p150]];
+  document.getElementById('dashGdpLoteBody').innerHTML = keys.length?keys.map(k=>{
+    const arr=lotes[k];
+    const conGap=arr.filter(p=>gapMap[String(p.hembra).trim()]).length;
+    const gdpT=tramosLote.map(([cur,prev,dias])=>{
       const vals=[];
-      conRefrac.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(!g) return;
+      arr.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(!g) return;
         const pcur=g[cur], pprev=(prev==='peso_nacer')?p.peso_nacer:g[prev];
         if(pcur!=null&&pprev!=null&&dias>0) vals.push((pcur-pprev)/dias);
       });
       return vals.length?avg(vals):null;
     });
     const cell=v=>`<td class="mono ${gdpClass(v)}">${v!=null?v.toFixed(3):'—'}</td>`;
-    return `<tr><td style="font-weight:600">${band.n}</td><td class="mono">${cnt}</td>${gdpTramo.map(cell).join('')}</tr>`;
-  }).join('');
+    return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${conGap}</td>${gdpT.map(cell).join('')}</tr>`;
+  }).join(''):'<tr><td colspan="6" class="empty">Sin datos.</td></tr>';
+
+  // GDP por refractometría — tiene su propio selector independiente
+  buildRefracGdpSelector();
+  renderRefracGdp();
 
   // Salidas por etapa
   const etapaCnt=ETAPAS.map(()=>0); let sinEdad=0;
@@ -520,6 +534,42 @@ function renderDashboard(){
   mkChart('chNac','bar',keys.map(loteLabel),[{label:'Nacidas',data:keys.map(k=>lotes[k].length),backgroundColor:'rgba(180,83,42,.75)'}]);
   mkChart('chRef','line',keys.map(loteLabel),[{label:'Refrac',data:keys.map(k=>{const rf=lotes[k].filter(p=>p.refractometria!=null).map(p=>p.refractometria);const a=avg(rf);return a?+a.toFixed(2):null;}),borderColor:A2,backgroundColor:'rgba(199,120,0,.1)',tension:.3,fill:true}]);
   mkChart('chEtapa','doughnut',ETAPAS.map(e=>e.n),[{data:etapaCnt,backgroundColor:['#e8d5cc','#e0a878','#c77800','#b4532a','#7a2d12'],borderWidth:1}]);
+}
+
+// GDP por refractometría con selector propio (mes / año / total)
+function buildRefracGdpSelector(){
+  const sel=document.getElementById('refracGdpSel'); if(!sel) return;
+  const prev=sel.value;
+  const hembras=_partos.filter(p=>esAreteNum(p.hembra)&&p.fecha_parto&&p.refractometria!=null);
+  const meses=[...new Set(hembras.map(p=>p.fecha_parto.slice(0,7)))].sort().reverse();
+  const anios=[...new Set(hembras.map(p=>p.fecha_parto.slice(0,4)))].sort().reverse();
+  let html='<option value="total">Total (todo)</option>';
+  anios.forEach(y=>html+=`<option value="A:${y}">Año ${y}</option>`);
+  meses.forEach(m=>html+=`<option value="M:${m}">${loteLabel(m)}</option>`);
+  sel.innerHTML=html;
+  if(prev && [...sel.options].some(o=>o.value===prev)) sel.value=prev;
+}
+function renderRefracGdp(){
+  const sel=document.getElementById('refracGdpSel');
+  const val=sel?sel.value:'total';
+  const gapMap={}; _gap.forEach(g=>gapMap[String(g.hembra).trim()]=g);
+  let hembras=_partos.filter(p=>esAreteNum(p.hembra)&&p.fecha_parto&&p.refractometria!=null);
+  if(val.startsWith('A:')) hembras=hembras.filter(p=>p.fecha_parto.slice(0,4)===val.slice(2));
+  else if(val.startsWith('M:')) hembras=hembras.filter(p=>p.fecha_parto.slice(0,7)===val.slice(2));
+  const tramos=[['peso_65','peso_nacer',EDADES.p65],['peso_90','peso_65',EDADES.p90-EDADES.p65],['peso_150','peso_90',EDADES.p150-EDADES.p90],['peso_180','peso_150',EDADES.p180-EDADES.p150]];
+  document.getElementById('dashRefracGdpBody').innerHTML = REFRAC_BANDS.map(band=>{
+    const grupo=hembras.filter(p=>band.test(p.refractometria));
+    const gdpT=tramos.map(([cur,prev,dias])=>{
+      const vals=[];
+      grupo.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(!g) return;
+        const pcur=g[cur], pprev=(prev==='peso_nacer')?p.peso_nacer:g[prev];
+        if(pcur!=null&&pprev!=null&&dias>0) vals.push((pcur-pprev)/dias);
+      });
+      return vals.length?avg(vals):null;
+    });
+    const cell=v=>`<td class="mono ${gdpClass(v)}">${v!=null?v.toFixed(3):'—'}</td>`;
+    return `<tr><td style="font-weight:600">${band.n}</td><td class="mono">${grupo.length}</td>${gdpT.map(cell).join('')}</tr>`;
+  }).join('');
 }
 
 // ============ PARTOS ============
