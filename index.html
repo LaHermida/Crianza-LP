@@ -143,10 +143,15 @@
         <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Peso Nacer Prom</th><th>Refrac. Prom</th><th>% ≥9</th><th>GDP→65 Prom</th><th>Peso 180 Prom</th></tr></thead>
         <tbody id="dashLoteBody"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
       </table></div>
-      <div class="group-label">🚪 Salidas por grupo mensual de nacimiento</div>
-      <div class="table-wrap" style="margin-bottom:1.5rem;max-width:640px"><table>
-        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Salidas</th><th>% Salidas</th></tr></thead>
-        <tbody id="dashSalLoteBody"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+      <div class="group-label">📅 Supervivencia por mes de nacida</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem;max-width:700px"><table>
+        <thead><tr><th>Mes (lote)</th><th>Nacidas</th><th>Activas en hato</th><th>Salidas</th><th>% Supervivencia</th></tr></thead>
+        <tbody id="dashSalLoteBody"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+      </table></div>
+      <div class="group-label">🥛 Ganancia de peso (GDP) por refractometría</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem"><table>
+        <thead><tr><th>Refractometría</th><th>Becerras</th><th>GDP→65</th><th>GDP→90</th><th>GDP→150</th><th>GDP→180</th></tr></thead>
+        <tbody id="dashRefracGdpBody"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
       </table></div>
       <div class="group-label">📋 Salidas por etapa de vida</div>
       <div class="table-wrap" style="max-width:520px;margin-bottom:1.5rem"><table>
@@ -308,6 +313,11 @@ const ETAPAS = [
   {n:'375+ días',    min:376, max:9999999},
 ];
 const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const REFRAC_BANDS=[
+  {n:'< 8',    test:v=>v<8},
+  {n:'8 - 10', test:v=>v>=8&&v<=10},
+  {n:'> 10',   test:v=>v>10},
+];
 /* ============================================================ */
 
 let currentUser=null, editingPartoId=null, editingGapId=null, dashYear='all';
@@ -462,14 +472,32 @@ function renderDashboard(){
       <td class="mono ${gdpClass(gAvg)}">${gAvg!=null?gAvg.toFixed(3):'—'}</td><td class="mono">${fmtN(avg(p180))}</td></tr>`;
   }).join(''):'<tr><td colspan="7" class="empty">Sin datos.</td></tr>';
 
-  // Salidas por lote
+  // Supervivencia por lote (cuántas siguen en hato)
   const salLote={};
   salidas.forEach(s=>{ const p=partoMap[String(s.hembra).trim()]; if(p){ const k=p.fecha_parto.slice(0,7); salLote[k]=(salLote[k]||0)+1; } });
   document.getElementById('dashSalLoteBody').innerHTML = keys.length?keys.map(k=>{
-    const n=lotes[k].length, sl=salLote[k]||0;
-    return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${n}</td><td class="mono">${sl}</td>
-      <td class="mono ${n&&sl/n>=0.3?'bad':n&&sl/n>=0.15?'warn':'ok'}">${n?Math.round(sl/n*100):0}%</td></tr>`;
-  }).join(''):'<tr><td colspan="4" class="empty">Sin datos.</td></tr>';
+    const n=lotes[k].length, sl=salLote[k]||0, act=n-sl;
+    const pctS=n?Math.round(act/n*100):0;
+    return `<tr><td style="font-weight:600">${loteLabel(k)}</td><td class="mono">${n}</td><td class="mono">${act}</td><td class="mono">${sl}</td>
+      <td class="mono ${pctS>=85?'ok':pctS>=70?'warn':'bad'}">${pctS}%</td></tr>`;
+  }).join(''):'<tr><td colspan="5" class="empty">Sin datos.</td></tr>';
+
+  // GDP por refractometría (4 tramos)
+  const tramos=[['peso_65','peso_nacer',EDADES.p65,'p65'],['peso_90','peso_65',EDADES.p90-EDADES.p65,'p90'],['peso_150','peso_90',EDADES.p150-EDADES.p90,'p150'],['peso_180','peso_150',EDADES.p180-EDADES.p150,'p180']];
+  document.getElementById('dashRefracGdpBody').innerHTML = REFRAC_BANDS.map(band=>{
+    const conRefrac=hembras.filter(p=>p.refractometria!=null&&band.test(p.refractometria));
+    const cnt=conRefrac.length;
+    const gdpTramo=tramos.map(([cur,prev,dias])=>{
+      const vals=[];
+      conRefrac.forEach(p=>{ const g=gapMap[String(p.hembra).trim()]; if(!g) return;
+        const pcur=g[cur], pprev=(prev==='peso_nacer')?p.peso_nacer:g[prev];
+        if(pcur!=null&&pprev!=null&&dias>0) vals.push((pcur-pprev)/dias);
+      });
+      return vals.length?avg(vals):null;
+    });
+    const cell=v=>`<td class="mono ${gdpClass(v)}">${v!=null?v.toFixed(3):'—'}</td>`;
+    return `<tr><td style="font-weight:600">${band.n}</td><td class="mono">${cnt}</td>${gdpTramo.map(cell).join('')}</tr>`;
+  }).join('');
 
   // Salidas por etapa
   const etapaCnt=ETAPAS.map(()=>0); let sinEdad=0;
